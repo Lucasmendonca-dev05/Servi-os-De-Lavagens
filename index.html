@@ -1,11 +1,16 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestão de Lavagem - AutoClean</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
     <style>
         :root {
             --primary-color: #3498db;
@@ -20,6 +25,18 @@
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: #f8f9fa;
+            height: 100vh;
+        }
+
+        .auth-container {
+            max-width: 400px;
+            margin: 0 auto;
+            padding-top: 100px;
+        }
+
+        .auth-card {
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
         }
 
         .sidebar {
@@ -115,12 +132,12 @@
                 height: auto;
                 padding-top: 0;
             }
-            
+
             main {
                 padding-top: 1rem;
             }
         }
-        
+
         .db-info {
             position: fixed;
             bottom: 10px;
@@ -131,188 +148,282 @@
             border-radius: 5px;
             font-size: 12px;
         }
+        
+        .user-info {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(0,0,0,0.7);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            z-index: 1000;
+        }
     </style>
+    <!-- Configuração Firebase -->
+    <script>
+        // Substitua com suas credenciais do Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyAvzJ2JpPJ0RNB8_CnqSIRz0Nv-M2sSeZw",
+            authDomain: "projeto-lavagem.firebaseapp.com",
+            projectId: "projeto-lavagem",
+            storageBucket: "projeto-lavagem.firebasestorage.app",
+            messagingSenderId: "1:236927620626:web:387d1051803dfb0524eacb",
+            appId: "G-50HS0CZ5ZM"
+        };
+
+        // Inicializar Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+    </script>
 </head>
+
 <body>
-    <div class="container-fluid">
-        <div class="row">
-            <!-- Sidebar -->
-            <nav id="sidebar" class="col-md-3 col-lg-2 d-md-block bg-dark sidebar collapse">
-                <div class="position-sticky pt-3">
-                    <div class="text-center mb-4">
-                        <img src="logo.jpeg" alt="Logo" class="img-fluid">
-                    </div>
-                    <ul class="nav flex-column">
-                        <li class="nav-item">
-                            <a class="nav-link active" href="#">
-                                <i class="bi bi-speedometer2 me-2"></i>Dashboard
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="#novo-servico">
-                                <i class="bi bi-plus-circle me-2"></i>Novo Serviço
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="#historico">
-                                <i class="bi bi-clock-history me-2"></i>Histórico
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-            </nav>
-
-            <!-- Main Content -->
-            <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
-                <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">Dashboard</h1>
-                    <div class="btn-toolbar mb-2 mb-md-0">
-                        <div class="btn-group me-2">
-                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="exportarDados()">
-                                <i class="bi bi-download"></i> Exportar
-                            </button>
-                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="importarDados()">
-                                <i class="bi bi-upload"></i> Importar
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Cards Resumo -->
-                <div class="row mb-4">
-                    <div class="col-md-12">
-                        <div class="card text-white bg-primary mb-3">
-                            <div class="card-body">
-                                <h5 class="card-title">Serviços Hoje</h5>
-                                <p class="card-text display-6" id="servicos-hoje">0</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Formulário Novo Serviço -->
-                <div class="card mb-4" id="novo-servico">
-                    <div class="card-header bg-dark text-white">
-                        <i class="bi bi-plus-circle me-2"></i> Registrar Novo Serviço
-                    </div>
-                    <div class="card-body">
-                        <form id="servico-form">
-                            <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <label for="placa" class="form-label">Placa do Veículo</label>
-                                    <input type="text" class="form-control" id="placa" required>
-                                </div>
-                                <div class="col-md-6">
-                                    <label for="tipo-servico" class="form-label">Tipo de Serviço</label>
-                                    <select class="form-select" id="tipo-servico" required>
-                                        <option value="" selected disabled>Selecione...</option>
-                                        <option value="completa">Lavagem Completa</option>
-                                        <option value="rapida">Lavagem Rápida</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="row mb-3">
-                                <div class="col-md-4">
-                                    <label for="data-entrada" class="form-label">Data de Entrada</label>
-                                    <input type="datetime-local" class="form-control" id="data-entrada" required>
-                                </div>
-                                <div class="col-md-4">
-                                    <label for="data-inicio" class="form-label">Início do Serviço</label>
-                                    <input type="datetime-local" class="form-control" id="data-inicio">
-                                </div>
-                                <div class="col-md-4">
-                                    <label for="data-termino" class="form-label">Término do Serviço</label>
-                                    <input type="datetime-local" class="form-control" id="data-termino">
-                                </div>
-                            </div>
-                            <div class="row mb-3">
-                                <div class="col-md-12">
-                                    <label for="observacoes" class="form-label">Observações</label>
-                                    <textarea class="form-control" id="observacoes" rows="2"></textarea>
-                                </div>
-                            </div>
-                            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                                <button type="reset" class="btn btn-secondary me-md-2">
-                                    <i class="bi bi-x-circle"></i> Limpar
-                                </button>
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="bi bi-save"></i> Salvar Serviço
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-
-                <!-- Tabela de Serviços Recentes -->
-                <div class="card" id="historico">
-                    <div class="card-header bg-dark text-white">
-                        <i class="bi bi-clock-history me-2"></i> Histórico de Serviços
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-striped table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Placa</th>
-                                        <th>Serviço</th>
-                                        <th>Entrada</th>
-                                        <th>Início</th>
-                                        <th>Término</th>
-                                        <th>Status</th>
-                                        <th>Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="servicos-table">
-                                    <!-- Dados serão preenchidos via JavaScript -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </main>
+    <!-- Tela de Login/Registro -->
+    <div id="auth-container" class="auth-container">
+        <div class="text-center mb-4">
+            <h2>AutoClean</h2>
+            <p class="text-muted">Gestão de Lavagem de Veículos</p>
         </div>
-    </div>
-    
-    <div class="db-info">
-        <span id="db-status">Banco de Dados: Carregando...</span>
-    </div>
-
-    <!-- Modal de Confirmação -->
-    <div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Confirmação</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        
+        <div class="card auth-card">
+            <div class="card-header bg-primary text-white text-center">
+                <h4>Entrar no Sistema</h4>
+            </div>
+            <div class="card-body">
+                <div id="auth-message" class="alert d-none"></div>
+                
+                <form id="login-form" class="mb-3">
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="email" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Senha</label>
+                        <input type="password" class="form-control" id="password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Entrar</button>
+                </form>
+                
+                <div class="text-center mb-3">
+                    <button class="btn btn-link" onclick="showRegisterForm()">Criar nova conta</button>
                 </div>
-                <div class="modal-body" id="confirmModalBody">
-                    Serviço registrado com sucesso!
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
-                </div>
+                
+                <form id="register-form" class="d-none">
+                    <div class="mb-3">
+                        <label for="reg-name" class="form-label">Nome</label>
+                        <input type="text" class="form-control" id="reg-name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="reg-email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="reg-email" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="reg-password" class="form-label">Senha (mínimo 6 caracteres)</label>
+                        <input type="password" class="form-control" id="reg-password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="reg-confirm-password" class="form-label">Confirmar Senha</label>
+                        <input type="password" class="form-control" id="reg-confirm-password" required>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-success">Registrar</button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="showLoginForm()">Voltar para Login</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
 
-    <!-- Modal de Importação -->
-    <div class="modal fade" id="importModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Importar Dados</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="fileInput" class="form-label">Selecione o arquivo JSON de backup</label>
-                        <input class="form-control" type="file" id="fileInput" accept=".json">
+    <!-- Aplicação Principal (visível apenas após login) -->
+    <div id="app-container" class="d-none">
+        <div class="user-info">
+            <span id="user-email"></span>
+            <button class="btn btn-sm btn-outline-light ms-2" onclick="logout()">Sair</button>
+        </div>
+        
+        <div class="container-fluid">
+            <div class="row">
+                <!-- Sidebar -->
+                <nav id="sidebar" class="col-md-3 col-lg-2 d-md-block bg-dark sidebar collapse">
+                    <div class="position-sticky pt-3">
+                        <div class="text-center mb-4">
+                            <img src="logo.jpeg" alt="Logo" class="img-fluid">
+                        </div>
+                        <ul class="nav flex-column">
+                            <li class="nav-item">
+                                <a class="nav-link active" href="#">
+                                    <i class="bi bi-speedometer2 me-2"></i>Dashboard
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="#novo-servico">
+                                    <i class="bi bi-plus-circle me-2"></i>Novo Serviço
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="#historico">
+                                    <i class="bi bi-clock-history me-2"></i>Histórico
+                                </a>
+                            </li>
+                        </ul>
                     </div>
-                    <div id="import-result" class="mt-3"></div>
+                </nav>
+
+                <!-- Main Content -->
+                <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+                    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                        <h1 class="h2">Dashboard</h1>
+                        <div class="btn-toolbar mb-2 mb-md-0">
+                            <div class="btn-group me-2">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="exportarDados()">
+                                    <i class="bi bi-download"></i> Exportar
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="importarDados()">
+                                    <i class="bi bi-upload"></i> Importar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cards Resumo -->
+                    <div class="row mb-4">
+                        <div class="col-md-12">
+                            <div class="card text-white bg-primary mb-3">
+                                <div class="card-body">
+                                    <h5 class="card-title">Serviços Hoje</h5>
+                                    <p class="card-text display-6" id="servicos-hoje">0</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Formulário Novo Serviço -->
+                    <div class="card mb-4" id="novo-servico">
+                        <div class="card-header bg-dark text-white">
+                            <i class="bi bi-plus-circle me-2"></i> Registrar Novo Serviço
+                        </div>
+                        <div class="card-body">
+                            <form id="servico-form">
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label for="placa" class="form-label">Placa do Veículo</label>
+                                        <input type="text" class="form-control" id="placa" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label for="tipo-servico" class="form-label">Tipo de Serviço</label>
+                                        <select class="form-select" id="tipo-servico" required>
+                                            <option value="" selected disabled>Selecione...</option>
+                                            <option value="completa">Lavagem Completa</option>
+                                            <option value="rapida">Lavagem Rápida</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-4">
+                                        <label for="data-entrada" class="form-label">Data de Entrada</label>
+                                        <input type="datetime-local" class="form-control" id="data-entrada" required>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="data-inicio" class="form-label">Início do Serviço</label>
+                                        <input type="datetime-local" class="form-control" id="data-inicio">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="data-termino" class="form-label">Término do Serviço</label>
+                                        <input type="datetime-local" class="form-control" id="data-termino">
+                                    </div>
+                                </div>
+                                <div class="row mb-3">
+                                    <div class="col-md-12">
+                                        <label for="observacoes" class="form-label">Observações</label>
+                                        <textarea class="form-control" id="observacoes" rows="2"></textarea>
+                                    </div>
+                                </div>
+                                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                    <button type="reset" class="btn btn-secondary me-md-2">
+                                        <i class="bi bi-x-circle"></i> Limpar
+                                    </button>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="bi bi-save"></i> Salvar Serviço
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Tabela de Serviços Recentes -->
+                    <div class="card" id="historico">
+                        <div class="card-header bg-dark text-white">
+                            <i class="bi bi-clock-history me-2"></i> Histórico de Serviços
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-striped table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Placa</th>
+                                            <th>Serviço</th>
+                                            <th>Entrada</th>
+                                            <th>Início</th>
+                                            <th>Término</th>
+                                            <th>Status</th>
+                                            <th>Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="servicos-table">
+                                        <!-- Dados serão preenchidos via JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        </div>
+
+        <div class="db-info">
+            <span id="db-status">Banco de Dados: Firebase</span>
+        </div>
+
+        <!-- Modal de Confirmação -->
+        <div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Confirmação</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body" id="confirmModalBody">
+                        Serviço registrado com sucesso!
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                    </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="button" class="btn btn-primary" onclick="processarImportacao()">Importar</button>
+            </div>
+        </div>
+
+        <!-- Modal de Importação -->
+        <div class="modal fade" id="importModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Importar Dados</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="fileInput" class="form-label">Selecione o arquivo JSON de backup</label>
+                            <input class="form-control" type="file" id="fileInput" accept=".json">
+                        </div>
+                        <div id="import-result" class="mt-3"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-primary" onclick="processarImportacao()">Importar</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -320,32 +431,58 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script>
-        // Configuração do Banco de Dados Local
-        const DB_NAME = 'lavagem_veiculos';
-        const DB_VERSION = 1;
-        const STORE_NAME = 'servicos';
-        
-        let db = null;
-        let dbStatus = document.getElementById('db-status');
-        
         // Elementos do DOM
+        const authContainer = document.getElementById('auth-container');
+        const appContainer = document.getElementById('app-container');
+        const loginForm = document.getElementById('login-form');
+        const registerForm = document.getElementById('register-form');
+        const authMessage = document.getElementById('auth-message');
+        const userEmailElement = document.getElementById('user-email');
         const servicoForm = document.getElementById('servico-form');
         const servicosTable = document.getElementById('servicos-table');
         const servicosHoje = document.getElementById('servicos-hoje');
-        
+
+        // Estado global
+        let currentUser = null;
+
         // Inicialização
         document.addEventListener('DOMContentLoaded', () => {
-            initDB().then(() => {
-                carregarServicos();
-                atualizarResumo();
-                
-                // Configurar data/hora atual como padrão
-                const now = new Date();
-                const dataEntrada = document.getElementById('data-entrada');
-                dataEntrada.value = formatDateTimeLocal(now);
+            // Verificar estado de autenticação
+            auth.onAuthStateChanged(user => {
+                if (user) {
+                    // Usuário logado
+                    currentUser = user;
+                    userEmailElement.textContent = user.email;
+                    authContainer.classList.add('d-none');
+                    appContainer.classList.remove('d-none');
+                    carregarServicos();
+                    
+                    // Configurar data/hora atual como padrão
+                    const now = new Date();
+                    const dataEntrada = document.getElementById('data-entrada');
+                    dataEntrada.value = formatDateTimeLocal(now);
+                } else {
+                    // Usuário não logado
+                    authContainer.classList.remove('d-none');
+                    appContainer.classList.add('d-none');
+                }
             });
         });
-        
+
+        // Mostrar formulário de registro
+        function showRegisterForm() {
+            loginForm.classList.add('d-none');
+            registerForm.classList.remove('d-none');
+            authMessage.classList.add('d-none');
+        }
+
+        // Mostrar formulário de login
+        function showLoginForm() {
+            registerForm.classList.add('d-none');
+            loginForm.classList.remove('d-none');
+            authMessage.classList.add('d-none');
+        }
+
         // Formatar data para input datetime-local
         function formatDateTimeLocal(date) {
             const year = date.getFullYear();
@@ -353,14 +490,14 @@
             const day = String(date.getDate()).padStart(2, '0');
             const hours = String(date.getHours()).padStart(2, '0');
             const minutes = String(date.getMinutes()).padStart(2, '0');
-            
+
             return `${year}-${month}-${day}T${hours}:${minutes}`;
         }
-        
+
         // Formatar data para exibição
         function formatDateDisplay(dateString) {
             if (!dateString) return '-';
-            
+
             const date = new Date(dateString);
             return date.toLocaleString('pt-BR', {
                 day: '2-digit',
@@ -370,18 +507,16 @@
                 minute: '2-digit'
             });
         }
-        
+
         // Determinar status do serviço
         function getStatus(servico) {
             if (servico.data_termino) return 'Concluído';
             if (servico.data_inicio) return 'Em Andamento';
             return 'Aguardando';
         }
-        
+
         // Adicionar serviço à tabela
         function addServicoToTable(servico) {
-            const row = document.createElement('tr');
-            
             // Determinar classe do status
             let statusClass = '';
             switch(getStatus(servico)) {
@@ -389,7 +524,8 @@
                 case 'Em Andamento': statusClass = 'bg-andamento'; break;
                 default: statusClass = 'bg-aguardando';
             }
-            
+
+            const row = document.createElement('tr');
             row.innerHTML = `
                 <td>${servico.placa}</td>
                 <td>${servico.tipo_servico}</td>
@@ -398,97 +534,65 @@
                 <td>${formatDateDisplay(servico.data_termino)}</td>
                 <td><span class="status-badge ${statusClass}">${getStatus(servico)}</span></td>
                 <td>
-                    <button class="btn btn-sm btn-outline-primary btn-action" onclick="iniciarServico(${servico.id})">
+                    <button class="btn btn-sm btn-outline-primary btn-action" onclick="iniciarServico('${servico.id}')">
                         <i class="bi bi-play"></i>
                     </button>
-                    <button class="btn btn-sm btn-outline-success btn-action" onclick="finalizarServico(${servico.id})">
+                    <button class="btn btn-sm btn-outline-success btn-action" onclick="finalizarServico('${servico.id}')">
                         <i class="bi bi-check"></i>
                     </button>
-                    <button class="btn btn-sm btn-outline-danger btn-action" onclick="excluirServico(${servico.id})">
+                    <button class="btn btn-sm btn-outline-danger btn-action" onclick="excluirServico('${servico.id}')">
                         <i class="bi bi-trash"></i>
                     </button>
                 </td>
             `;
-            
+
             servicosTable.appendChild(row);
         }
-        
-        // Inicializar o banco de dados
-        function initDB() {
-            return new Promise((resolve, reject) => {
-                const request = indexedDB.open(DB_NAME, DB_VERSION);
-                
-                request.onerror = (event) => {
-                    dbStatus.textContent = 'Erro ao abrir o banco de dados';
-                    console.error('Erro ao abrir o banco de dados:', event.target.error);
-                    reject(event.target.error);
-                };
-                
-                request.onsuccess = (event) => {
-                    db = event.target.result;
-                    dbStatus.textContent = 'Banco de Dados: Conectado';
-                    resolve();
-                };
-                
-                request.onupgradeneeded = (event) => {
-                    const db = event.target.result;
-                    
-                    // Cria o objeto de armazenamento (tabela) se não existir
-                    if (!db.objectStoreNames.contains(STORE_NAME)) {
-                        const store = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
-                        // Cria índices para consulta
-                        store.createIndex('placa', 'placa', { unique: false });
-                        store.createIndex('data_entrada', 'data_entrada', { unique: false });
-                    }
-                };
-            });
-        }
-        
-        // Carregar serviços do banco de dados
-        async function carregarServicos() {
+
+        // Carregar serviços do Firestore
+        function carregarServicos() {
+            if (!currentUser) return;
+            
             servicosTable.innerHTML = '<tr><td colspan="7" class="text-center">Carregando...</td></tr>';
             
-            try {
-                const servicos = await getAllServicos();
-                
-                servicosTable.innerHTML = '';
-                
-                if (servicos.length === 0) {
-                    servicosTable.innerHTML = '<tr><td colspan="7" class="text-center">Nenhum serviço registrado</td></tr>';
-                    return;
-                }
-                
-                // Ordena por data de entrada (mais recente primeiro)
-                servicos.sort((a, b) => new Date(b.data_entrada) - new Date(a.data_entrada));
-                
-                servicos.forEach(servico => addServicoToTable(servico));
-            } catch (error) {
-                console.error('Erro ao carregar serviços:', error);
-                servicosTable.innerHTML = '<tr><td colspan="7" class="text-center text-danger">Erro ao carregar serviços</td></tr>';
-            }
+            db.collection("servicos")
+                .where("userId", "==", currentUser.uid)
+                .orderBy("data_entrada", "desc")
+                .get()
+                .then((querySnapshot) => {
+                    servicosTable.innerHTML = '';
+                    
+                    if (querySnapshot.empty) {
+                        servicosTable.innerHTML = '<tr><td colspan="7" class="text-center">Nenhum serviço registrado</td></tr>';
+                        return;
+                    }
+                    
+                    querySnapshot.forEach((doc) => {
+                        const servico = { id: doc.id, ...doc.data() };
+                        addServicoToTable(servico);
+                    });
+                    atualizarResumo();
+                })
+                .catch((error) => {
+                    console.error("Erro ao carregar serviços:", error);
+                    servicosTable.innerHTML = '<tr><td colspan="7" class="text-center text-danger">Erro ao carregar serviços</td></tr>';
+                });
         }
-        
-        // Obter todos os serviços
-        function getAllServicos() {
-            return new Promise((resolve, reject) => {
-                const transaction = db.transaction([STORE_NAME], 'readonly');
-                const store = transaction.objectStore(STORE_NAME);
-                const request = store.getAll();
-                
-                request.onsuccess = () => resolve(request.result);
-                request.onerror = (event) => reject(event.target.error);
-            });
-        }
-        
+
         // Atualizar resumo (apenas serviços hoje)
         async function atualizarResumo() {
+            if (!currentUser) return;
+            
+            const hoje = new Date();
+            hoje.setHours(0, 0, 0, 0);
+            
             try {
-                const hoje = new Date();
-                hoje.setHours(0, 0, 0, 0);
-                
-                const todosServicos = await getAllServicos();
-                const servicosHojeCount = todosServicos.filter(servico => {
-                    const dataEntrada = new Date(servico.data_entrada);
+                const snapshot = await db.collection("servicos")
+                    .where("userId", "==", currentUser.uid)
+                    .get();
+                    
+                const servicosHojeCount = snapshot.docs.filter(doc => {
+                    const dataEntrada = new Date(doc.data().data_entrada);
                     return dataEntrada >= hoje;
                 }).length;
                 
@@ -497,18 +601,23 @@
                 console.error('Erro ao atualizar resumo:', error);
             }
         }
-        
+
         // Registrar novo serviço
         servicoForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             
+            if (!currentUser) {
+                showAuthMessage('Você precisa estar logado para registrar serviços', 'danger');
+                return;
+            }
+
             const placa = document.getElementById('placa').value;
             const tipoServico = document.getElementById('tipo-servico').value;
             const dataEntrada = document.getElementById('data-entrada').value;
             const dataInicio = document.getElementById('data-inicio').value;
             const dataTermino = document.getElementById('data-termino').value;
             const observacoes = document.getElementById('observacoes').value;
-            
+
             try {
                 const servico = {
                     placa: placa.toUpperCase(),
@@ -516,24 +625,25 @@
                     data_entrada: dataEntrada,
                     data_inicio: dataInicio || null,
                     data_termino: dataTermino || null,
-                    observacoes: observacoes
+                    observacoes: observacoes,
+                    userId: currentUser.uid  // Associar serviço ao usuário
                 };
-                
-                const id = await addServico(servico);
-                servico.id = id;
+
+                // Adicionar ao Firestore
+                const docRef = await db.collection("servicos").add(servico);
                 
                 // Mostrar modal de confirmação
                 const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
-                document.getElementById('confirmModalBody').textContent = 'Serviço registrado com sucesso!';
+                document.getElementById('confirmModalBody').textContent = 'Serviço registrado com sucesso! ID: ' + docRef.id;
                 confirmModal.show();
-                
+
                 // Atualizar tabela e resumo
                 carregarServicos();
                 atualizarResumo();
-                
+
                 // Limpar formulário
                 servicoForm.reset();
-                
+
                 // Resetar data/hora atual
                 const now = new Date();
                 document.getElementById('data-entrada').value = formatDateTimeLocal(now);
@@ -544,64 +654,13 @@
                 confirmModal.show();
             }
         });
-        
-        // Adicionar serviço ao banco de dados
-        function addServico(servico) {
-            return new Promise((resolve, reject) => {
-                const transaction = db.transaction([STORE_NAME], 'readwrite');
-                const store = transaction.objectStore(STORE_NAME);
-                const request = store.add(servico);
-                
-                request.onsuccess = (event) => resolve(event.target.result); // Retorna o ID
-                request.onerror = (event) => reject(event.target.error);
-            });
-        }
-        
-        // Atualizar serviço no banco de dados
-        function updateServico(servico) {
-            return new Promise((resolve, reject) => {
-                const transaction = db.transaction([STORE_NAME], 'readwrite');
-                const store = transaction.objectStore(STORE_NAME);
-                const request = store.put(servico);
-                
-                request.onsuccess = () => resolve();
-                request.onerror = (event) => reject(event.target.error);
-            });
-        }
-        
-        // Excluir serviço do banco de dados
-        function deleteServico(id) {
-            return new Promise((resolve, reject) => {
-                const transaction = db.transaction([STORE_NAME], 'readwrite');
-                const store = transaction.objectStore(STORE_NAME);
-                const request = store.delete(id);
-                
-                request.onsuccess = () => resolve();
-                request.onerror = (event) => reject(event.target.error);
-            });
-        }
-        
-        // Obter serviço por ID
-        function getServico(id) {
-            return new Promise((resolve, reject) => {
-                const transaction = db.transaction([STORE_NAME], 'readonly');
-                const store = transaction.objectStore(STORE_NAME);
-                const request = store.get(id);
-                
-                request.onsuccess = () => resolve(request.result);
-                request.onerror = (event) => reject(event.target.error);
-            });
-        }
-        
+
         // Iniciar serviço
         async function iniciarServico(id) {
             try {
-                const servico = await getServico(id);
-                if (!servico) throw new Error('Serviço não encontrado');
-                
-                servico.data_inicio = new Date().toISOString();
-                await updateServico(servico);
-                
+                await db.collection("servicos").doc(id).update({
+                    data_inicio: new Date().toISOString()
+                });
                 carregarServicos();
                 atualizarResumo();
             } catch (error) {
@@ -611,16 +670,13 @@
                 confirmModal.show();
             }
         }
-        
+
         // Finalizar serviço
         async function finalizarServico(id) {
             try {
-                const servico = await getServico(id);
-                if (!servico) throw new Error('Serviço não encontrado');
-                
-                servico.data_termino = new Date().toISOString();
-                await updateServico(servico);
-                
+                await db.collection("servicos").doc(id).update({
+                    data_termino: new Date().toISOString()
+                });
                 carregarServicos();
                 atualizarResumo();
             } catch (error) {
@@ -630,13 +686,13 @@
                 confirmModal.show();
             }
         }
-        
+
         // Excluir serviço
         async function excluirServico(id) {
             if (!confirm('Tem certeza que deseja excluir este serviço?')) return;
             
             try {
-                await deleteServico(id);
+                await db.collection("servicos").doc(id).delete();
                 carregarServicos();
                 atualizarResumo();
             } catch (error) {
@@ -646,49 +702,56 @@
                 confirmModal.show();
             }
         }
-        
+
+        // Exportar dados para Excel
         async function exportarDados() {
-    try {
-        const servicos = await getAllServicos();
+            try {
+                const querySnapshot = await db.collection("servicos")
+                    .where("userId", "==", currentUser.uid)
+                    .get();
+                    
+                const servicos = [];
+                
+                querySnapshot.forEach((doc) => {
+                    servicos.push({ id: doc.id, ...doc.data() });
+                });
 
-        // Formata os dados em uma estrutura de planilha
-        const worksheetData = servicos.map(s => ({
-            Placa: s.placa,
-            Tipo: s.tipo_servico,
-            Entrada: formatDateDisplay(s.data_entrada),
-            Inicio: formatDateDisplay(s.data_inicio),
-            Termino: formatDateDisplay(s.data_termino),
-            Status: getStatus(s),
-            Observações: s.observacoes || ''
-        }));
+                // Formata os dados em uma estrutura de planilha
+                const worksheetData = servicos.map(s => ({
+                    Placa: s.placa,
+                    Tipo: s.tipo_servico,
+                    Entrada: formatDateDisplay(s.data_entrada),
+                    Inicio: formatDateDisplay(s.data_inicio),
+                    Termino: formatDateDisplay(s.data_termino),
+                    Status: getStatus(s),
+                    Observações: s.observacoes || ''
+                }));
 
-        // Cria a planilha
-        const worksheet = XLSX.utils.json_to_sheet(worksheetData);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Serviços");
+                // Cria a planilha
+                const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, "Serviços");
 
-        // Gera o arquivo
-        const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
-        const blob = new Blob([excelBuffer], { type: "application/octet-stream" });
+                // Gera o arquivo
+                const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+                const blob = new Blob([excelBuffer], { type: "application/octet-stream" });
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(blob);
+                link.download = `lavagem-servicos-${new Date().toISOString().slice(0,10)}.xlsx`;
+                link.click();
 
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = `lavagem-servicos-${new Date().toISOString().slice(0,10)}.xlsx`;
-        link.click();
+                // Feedback
+                document.getElementById('confirmModalBody').textContent = `Arquivo Excel exportado com sucesso! (${servicos.length} registros)`;
+                const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+                confirmModal.show();
+            } catch (error) {
+                console.error('Erro ao exportar dados:', error);
+                document.getElementById('confirmModalBody').textContent = `Erro ao exportar dados: ${error.message}`;
+                const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+                confirmModal.show();
+            }
+        }
 
-        // Feedback
-        document.getElementById('confirmModalBody').textContent = `Arquivo Excel exportado com sucesso! (${servicos.length} registros)`;
-        const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
-        confirmModal.show();
-
-    } catch (error) {
-        console.error('Erro ao exportar dados:', error);
-        document.getElementById('confirmModalBody').textContent = `Erro ao exportar dados: ${error.message}`;
-        const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
-        confirmModal.show();
-    }
-}
-        
         // Importar dados de JSON
         function importarDados() {
             const importModal = new bootstrap.Modal(document.getElementById('importModal'));
@@ -696,29 +759,29 @@
             document.getElementById('fileInput').value = '';
             importModal.show();
         }
-        
+
         // Processar importação de dados
         async function processarImportacao() {
             const fileInput = document.getElementById('fileInput');
             const resultDiv = document.getElementById('import-result');
-            
+
             if (!fileInput.files.length) {
                 resultDiv.innerHTML = '<div class="alert alert-warning">Selecione um arquivo primeiro!</div>';
                 return;
             }
-            
+
             const file = fileInput.files[0];
             const reader = new FileReader();
-            
+
             reader.onload = async (event) => {
                 try {
                     const servicos = JSON.parse(event.target.result);
-                    
+
                     if (!Array.isArray(servicos)) {
                         throw new Error('O arquivo deve conter um array de serviços');
                     }
-                    
-                    // Adicionar cada serviço ao banco de dados
+
+                    // Adicionar cada serviço ao Firestore
                     let importados = 0;
                     let erros = 0;
                     
@@ -726,14 +789,16 @@
                         try {
                             // Remover ID existente para evitar conflitos
                             delete servico.id;
-                            await addServico(servico);
+                            // Associar ao usuário atual
+                            servico.userId = currentUser.uid;
+                            await db.collection("servicos").add(servico);
                             importados++;
                         } catch (error) {
                             console.error('Erro ao importar serviço:', servico, error);
                             erros++;
                         }
                     }
-                    
+
                     resultDiv.innerHTML = `
                         <div class="alert alert-success">
                             Importação concluída!<br>
@@ -741,7 +806,7 @@
                             Erros: ${erros}
                         </div>
                     `;
-                    
+
                     // Atualizar a interface
                     setTimeout(() => {
                         carregarServicos();
@@ -752,13 +817,74 @@
                     resultDiv.innerHTML = `<div class="alert alert-danger">Erro ao importar dados: ${error.message}</div>`;
                 }
             };
-            
+
             reader.onerror = (error) => {
                 resultDiv.innerHTML = `<div class="alert alert-danger">Erro ao ler o arquivo: ${error.target.error}</div>`;
             };
-            
+
             reader.readAsText(file);
+        }
+
+        // Mostrar mensagem de autenticação
+        function showAuthMessage(message, type = 'danger') {
+            authMessage.textContent = message;
+            authMessage.className = `alert alert-${type}`;
+            authMessage.classList.remove('d-none');
+        }
+
+        // Login com email/senha
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                await auth.signInWithEmailAndPassword(email, password);
+            } catch (error) {
+                console.error('Erro no login:', error);
+                showAuthMessage('Email ou senha incorretos', 'danger');
+            }
+        });
+
+        // Registrar nova conta
+        registerForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const name = document.getElementById('reg-name').value;
+            const email = document.getElementById('reg-email').value;
+            const password = document.getElementById('reg-password').value;
+            const confirmPassword = document.getElementById('reg-confirm-password').value;
+            
+            if (password !== confirmPassword) {
+                showAuthMessage('As senhas não coincidem', 'danger');
+                return;
+            }
+            
+            if (password.length < 6) {
+                showAuthMessage('A senha deve ter pelo menos 6 caracteres', 'danger');
+                return;
+            }
+            
+            try {
+                const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+                // Atualizar nome do usuário
+                await userCredential.user.updateProfile({
+                    displayName: name
+                });
+                showAuthMessage('Conta criada com sucesso! Faça login', 'success');
+                showLoginForm();
+            } catch (error) {
+                console.error('Erro no registro:', error);
+                showAuthMessage(error.message, 'danger');
+            }
+        });
+
+        // Logout
+        function logout() {
+            auth.signOut();
         }
     </script>
 </body>
+
 </html>
