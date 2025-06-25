@@ -671,7 +671,7 @@
                 const servico = {
                     placa: placa.toUpperCase(),
                     tipo_servico: tipoServico,
-                    data_entrada: dataEntrada,
+                    data_entrada: firebase.firestore.Timestamp.fromDate(new Date(dataEntrada)),
                     data_inicio: dataInicio || null,
                     data_termino: dataTermino || null,
                     observacoes: observacoes,
